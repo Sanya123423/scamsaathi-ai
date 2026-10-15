@@ -1,0 +1,21 @@
+{
+  "model_architecture": "TfidfVectorizer(ngram_range=(1,2)) + LogisticRegression(C=1.0)",
+  "total_samples": 60,
+  "held_out_metrics": {
+    "test_size": 15,
+    "accuracy": 0.8,
+    "precision": 0.75,
+    "recall": 0.8571,
+    "f1": 0.8
+  },
+  "target_classes": {
+    "0": "legitimate",
+    "1": "suspicious"
+  },
+  "dataset_limitations": [
+    "Small Sample Size: The seed dataset contains 60 curated examples. While sufficient for demonstration, real-world deployment requires tens of thousands of diverse SMS and email corpora.",
+    "Distribution Shift: Novel zero-day phishing narratives or slang may differ substantially from the training distribution.",
+    "Probabilistic Meaning: Model confidence scores indicate statistical feature similarity to training corpus distributions, NOT an objective mathematical probability of criminality.",
+    "Hybrid Architecture: The system relies primarily on deterministic rule-based heuristics with ML functioning as an auxiliary scoring signal."
+  ]
+}

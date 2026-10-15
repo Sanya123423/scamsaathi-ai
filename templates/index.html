@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ScamSaathi - Intelligent Cyber Threat Detection and Risk Assessment System. Analyze suspicious messages, SMS, emails, and URLs for phishing, job scams, and credential theft.">
+  <title>ScamSaathi | Intelligent Cyber Threat Detection & Risk Assessment</title>
+  
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+  <!-- Ambient cyber background glow elements -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <!-- Header / Navigation Bar -->
+  <header class="navbar" role="banner">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-icon-wrapper" aria-hidden="true">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-name">Scam<span class="brand-highlight">Saathi</span></span>
+            <span class="brand-badge" id="challenge-badge">ABSC-01</span>
+          </div>
+          <p class="brand-tagline">Think Before You Click. Verify Before You Trust.</p>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <div class="system-status-pill" id="system-status-indicator" title="Backend connection status">
+          <span class="status-dot status-checking" id="status-dot"></span>
+          <span class="status-label" id="status-label">Checking Backend...</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-stats" title="Refresh dashboard data">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Container -->
+  <main class="main-content" id="main-content">
+    
+    <!-- Top System Banner / Offline Notice (Hidden by default, shown if backend unavailable) -->
+    <div class="alert-banner hidden" id="backend-status-banner" role="alert" aria-live="assertive">
+      <div class="alert-banner-content">
+        <svg class="alert-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div class="alert-banner-text">
+          <strong>Backend Service Disconnected:</strong>
+          <span id="backend-banner-message">ScamSaathi Python backend is not running at <code>http://127.0.0.1:5000</code>. Please launch the backend server using <code>python app.py</code> to perform live AI scans.</span>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" id="btn-retry-backend">Retry Connection</button>
+    </div>
+
+    <!-- Telemetry & Metrics Stats Row -->
+    <section class="metrics-grid" aria-label="System Security Metrics">
+      <div class="metric-card" id="card-total-scans">
+        <div class="metric-header">
+          <span class="metric-title">Total Scans</span>
+          <div class="metric-icon-wrap icon-cyan" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value" id="metric-total-scans">--</div>
+        <div class="metric-footer">Analyzed cyber inputs</div>
+      </div>
+
+      <div class="metric-card" id="card-high-threats">
+        <div class="metric-header">
+          <span class="metric-title">High & Critical Threats</span>
+          <div class="metric-icon-wrap icon-red" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value threat-high" id="metric-high-threats">--</div>
+        <div class="metric-footer">Immediate action required</div>
+      </div>
+
+      <div class="metric-card" id="card-suspicious-urls">
+        <div class="metric-header">
+          <span class="metric-title">Suspicious URLs Flagged</span>
+          <div class="metric-icon-wrap icon-amber" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value threat-amber" id="metric-suspicious-urls">--</div>
+        <div class="metric-footer">Malicious & spoofed links</div>
+      </div>
+
+      <div class="metric-card" id="card-safe-rate">
+        <div class="metric-header">
+          <span class="metric-title">Low Risk / Benign</span>
+          <div class="metric-icon-wrap icon-emerald" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value threat-safe" id="metric-safe-scans">--</div>
+        <div class="metric-footer">Legitimate communications</div>
+      </div>
+    </section>
+
+    <!-- Two-Column Primary Workspace (Input / Scanner on Left, Dynamic Results on Right) -->
+    <div class="scanner-layout">
+      
+      <!-- LEFT COLUMN: Input & Analyzer Panel -->
+      <section class="card input-card" aria-labelledby="scanner-heading">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h1 class="card-title" id="scanner-heading">Threat Analyzer</h1>
+            <p class="card-subtitle">Inspect suspicious SMS, WhatsApp messages, emails, job offers, or URLs.</p>
+          </div>
+          <span class="privacy-badge" title="Data is processed locally and sensitive tokens are masked">
+            <svg class="privacy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span>Privacy Guard Active</span>
+          </span>
+        </div>
+
+        <!-- Quick Demo Test-cases (Crucial for Hackathon Presentations!) -->
+        <div class="sample-presets-container">
+          <span class="sample-label">Quick Demo Presets:</span>
+          <div class="preset-buttons" role="group" aria-label="Quick test case samples">
+            <button type="button" class="preset-btn" data-sample="electricity" title="Simulate an electricity disconnection notice scam">⚡ Electricity Bill Scam</button>
+            <button type="button" class="preset-btn" data-sample="telegram_job" title="Simulate a remote daily earning job scam">💼 Telegram Job Scam</button>
+            <button type="button" class="preset-btn" data-sample="bank_phishing" title="Simulate a banking KYC credential theft SMS">🏦 Bank KYC Phishing</button>
+            <button type="button" class="preset-btn" data-sample="clean_order" title="Simulate a legitimate parcel delivery SMS">📦 Clean Delivery SMS</button>
+          </div>
+        </div>
+
+        <form id="scan-form" novalidate>
+          <!-- Message Text Input Area (Supports English & Hindi) -->
+          <div class="form-group">
+            <div class="label-row">
+              <label for="message-input" class="form-label">
+                Suspicious Message Content
+                <span class="lang-tag">English & हिन्दी</span>
+              </label>
+              <span class="char-count" id="char-counter">0 chars</span>
+            </div>
+            <textarea 
+              id="message-input" 
+              name="message" 
+              rows="6" 
+              class="form-control text-area" 
+              placeholder="Paste suspicious SMS, WhatsApp message, email, or offer here...&#10;उदा. &quot;बिजली बिल जमा नहीं हुआ, आज रात 9:30 बजे बिजली काट दी जाएगी...&quot;"
+              aria-describedby="message-helper"
+            ></textarea>
+            <span class="field-hint" id="message-helper">ScamSaathi detects urgency tactics, impersonation, credential harvesting, and job fraud.</span>
+          </div>
+
+          <!-- URL Analysis Input Section -->
+          <div class="form-group">
+            <label for="url-input" class="form-label">
+              Suspicious URL / Web Link
+              <span class="optional-tag">(Optional or Standalone)</span>
+            </label>
+            <div class="url-input-wrapper">
+              <div class="url-prefix-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </div>
+              <input 
+                type="text" 
+                id="url-input" 
+                name="url" 
+                class="form-control url-control" 
+                placeholder="e.g. http://sbi-kyc-update.xyz/login or http://192.168.1.1/verify"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button type="button" class="btn btn-secondary btn-sm url-check-btn" id="btn-check-url-only" title="Inspect this URL offline without visiting">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                <span>Check URL</span>
+              </button>
+            </div>
+            <span class="field-hint">
+              <strong class="security-safe-tag">Safe Sandbox:</strong> Static forensics only. ScamSaathi inspects URL patterns, spoofing, and IP structures <em>without</em> sending web requests to the destination.
+            </span>
+          </div>
+
+          <!-- Form Action Buttons -->
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg" id="btn-analyze">
+              <svg class="btn-icon" id="analyze-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <span id="analyze-btn-text">Analyze Cyber Threat</span>
+            </button>
+            <button type="button" class="btn btn-ghost" id="btn-clear-inputs">Clear Form</button>
+          </div>
+
+          <!-- Inline Input Validation Error -->
+          <div class="input-error-msg hidden" id="input-error" role="alert" aria-live="polite">
+            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="input-error-text">Please provide a message or a URL to analyze.</span>
+          </div>
+        </form>
+      </section>
+
+      <!-- RIGHT COLUMN: Dynamic Analysis & Threat Assessment Results -->
+      <section class="card results-card" id="results-panel" aria-labelledby="results-heading">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 class="card-title" id="results-heading">Threat Assessment Report</h2>
+            <p class="card-subtitle">AI & Rule-Based Forensics with Explainable Signals</p>
+          </div>
+          <div id="result-severity-container">
+            <!-- Dynamic Severity Badge will be placed here: Low / Medium / High / Critical -->
+            <span class="badge badge-idle" id="result-idle-badge">Awaiting Input</span>
+          </div>
+        </div>
+
+        <!-- 1. EMPTY / IDLE STATE (Initial state before any scan) -->
+        <div class="state-container idle-state" id="state-idle">
+          <div class="idle-graphic" aria-hidden="true">
+            <div class="radar-scan-anim">
+              <div class="radar-line"></div>
+            </div>
+            <svg class="idle-shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <circle cx="12" cy="11" r="3"/>
+            </svg>
+          </div>
+          <h3 class="state-title">Ready for Cyber Threat Analysis</h3>
+          <p class="state-desc">
+            Submit a suspicious message or URL on the left panel, or select a demo preset to trigger the multi-layer detection pipeline.
+          </p>
+          <div class="detection-pipeline-features">
+            <div class="feature-chip">
+              <span class="chip-dot"></span>
+              Phishing & Job Fraud
+            </div>
+            <div class="feature-chip">
+              <span class="chip-dot"></span>
+              Zero-Request URL Inspection
+            </div>
+            <div class="feature-chip">
+              <span class="chip-dot"></span>
+              Explainable Signals
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. LOADING STATE -->
+        <div class="state-container loading-state hidden" id="state-loading" aria-live="polite">
+          <div class="cyber-spinner" aria-hidden="true"></div>
+          <h3 class="state-title">Analyzing Threat Indicators...</h3>
+          <p class="state-desc" id="loading-stage-text">De-obfuscating URL patterns, sanitizing PII, and running ML feature classifier...</p>
+        </div>
+
+        <!-- 3. ERROR STATE (Backend failure or processing issue) -->
+        <div class="state-container error-state hidden" id="state-error" role="alert" aria-live="assertive">
+          <div class="error-graphic" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <h3 class="state-title" id="error-title">Analysis Failed</h3>
+          <p class="state-desc" id="error-description">Unable to connect to the ScamSaathi backend engine.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-error-retry">Retry Scan</button>
+        </div>
+
+        <!-- 4. SUCCESS STATE (Rendered solely with genuine backend response data) -->
+        <div class="state-container success-state hidden" id="state-success">
+          
+          <!-- Risk Gauge & Summary Header -->
+          <div class="score-overview-box">
+            <div class="gauge-wrapper" aria-label="Risk Score Gauge">
+              <svg class="circular-gauge" viewBox="0 0 120 120" width="130" height="130">
+                <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
+                <circle class="gauge-fill" id="gauge-progress-circle" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div class="gauge-center-text">
+                <span class="score-number" id="risk-score-value">0</span>
+                <span class="score-scale">/100</span>
+              </div>
+            </div>
+
+            <div class="score-meta-details">
+              <div class="score-meta-top">
+                <span class="score-meta-label">Overall Risk Score</span>
+                <span class="severity-badge-dynamic" id="dynamic-severity-badge">Low</span>
+              </div>
+              <h3 class="primary-threat-label" id="primary-threat-type">Phishing Threat Detected</h3>
+              <p class="threat-summary-text" id="threat-summary-description">
+                High probability of impersonation attempting to harvest banking credentials.
+              </p>
+              <div class="threat-tags-list" id="threat-category-tags">
+                <!-- Tags populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Detected Warning Signs & Explainable Indicators -->
+          <div class="result-section">
+            <div class="section-title-row">
+              <svg class="section-icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <h4 class="section-title">Detected Warning Indicators</h4>
+              <span class="indicator-count" id="indicator-count-badge">0 found</span>
+            </div>
+            
+            <div class="warning-indicators-list" id="indicators-container">
+              <!-- Warning indicator cards rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Section: Machine Learning Text Classifier (Auxiliary & Experimental) -->
+          <div class="result-section hidden" id="ml-classification-section">
+            <div class="section-title-row">
+              <svg class="section-icon icon-indigo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <h4 class="section-title">Machine Learning Classifier</h4>
+              <span class="experimental-pill">Experimental (TF-IDF + LogReg)</span>
+            </div>
+            <div class="ml-card-box" id="ml-card-box">
+              <div class="ml-result-header">
+                <div class="ml-pred-badge-group">
+                  <span class="ml-pred-label">Statistical Prediction:</span>
+                  <span class="ml-category-badge" id="ml-category-badge">Suspicious / Scam</span>
+                </div>
+                <div class="ml-confidence-group">
+                  <span class="ml-confidence-val" id="ml-confidence-value">--%</span>
+                  <span class="ml-confidence-label">Vector Alignment</span>
+                </div>
+              </div>
+              <p class="ml-explanation-text" id="ml-explanation-text">
+                Model feature similarity to training corpus distributions.
+              </p>
+              <div class="ml-disclaimer-box" id="ml-disclaimer-text">
+                Note: ML confidence indicates statistical feature proximity, NOT verified mathematical probability of criminality. Small synthetic datasets may exhibit distribution shift.
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Static URL Forensics (Shown if a URL was inspected) -->
+          <div class="result-section hidden" id="url-forensics-section">
+            <div class="section-title-row">
+              <svg class="section-icon icon-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              <h4 class="section-title">Safe URL Forensic Inspection</h4>
+            </div>
+            <div class="url-forensic-box">
+              <div class="url-display-line">
+                <span class="url-display-label">Target URL (Non-Visited):</span>
+                <code class="url-display-code" id="forensic-url-text">--</code>
+              </div>
+              <div class="url-signals-grid" id="forensic-url-signals">
+                <!-- URL signals rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Recommended Safety Actions -->
+          <div class="result-section">
+            <div class="section-title-row">
+              <svg class="section-icon icon-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+              <h4 class="section-title">Recommended Safety Actions</h4>
+            </div>
+            <ul class="safety-actions-list" id="safety-recommendations-list">
+              <!-- Recommendations rendered dynamically -->
+            </ul>
+          </div>
+
+          <!-- Privacy Redaction Proof -->
+          <div class="privacy-note-footer">
+            <svg class="privacy-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span id="privacy-redacted-info">Redacted sensitive PII tokens before risk assessment.</span>
+          </div>
+
+        </div>
+
+      </section>
+    </div>
+
+    <!-- RECENT SCAN HISTORY TABLE -->
+    <section class="card history-card" aria-labelledby="history-heading">
+      <div class="card-header history-header">
+        <div class="card-title-group">
+          <h2 class="card-title" id="history-heading">Recent Cyber Threat Alerts & History</h2>
+          <p class="card-subtitle">Real-time log of scans performed by ScamSaathi</p>
+        </div>
+        <div class="history-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-history" title="Clear scan history records">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>Clear History</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="history-table" id="history-table">
+          <thead>
+            <tr>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Analyzed Content / Target</th>
+              <th scope="col">Threat Category</th>
+              <th scope="col">Risk Score</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <!-- Dynamically populated or empty state row -->
+            <tr class="empty-history-row" id="empty-history-placeholder">
+              <td colspan="6" class="empty-history-cell">
+                <div class="empty-history-msg">
+                  <svg class="empty-history-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <p>No scans recorded yet. Enter a message or URL above and click <strong>Analyze Cyber Threat</strong> to perform your first assessment.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="footer-container">
+      <div class="footer-left">
+        <span class="footer-logo">ScamSaathi</span> — Final Year B.Tech Project &bull; Challenge ABSC-01: Intelligent Cyber Threat Detection
+      </div>
+      <div class="footer-right">
+        <span>In case of actual financial fraud, report immediately to National Helpline <strong>1930</strong> or <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer" class="footer-link">cybercrime.gov.in</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
