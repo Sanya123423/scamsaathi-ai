@@ -5,6 +5,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Auto-detect base URL for API (supports both local Flask serving and direct file:/// opening)
+  const API_BASE = (window.location.protocol === 'file:' || !window.location.port || window.location.port !== '5000')
+    ? 'http://127.0.0.1:5000'
+    : '';
+
   // --- DOM Elements ---
   const scanForm = document.getElementById('scan-form');
   const messageInput = document.getElementById('message-input');
@@ -58,15 +63,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const metricSuspiciousUrls = document.getElementById('metric-suspicious-urls');
   const metricSafeScans = document.getElementById('metric-safe-scans');
 
-  // Scan History
+  // Scan History & Search System
   const historyTableBody = document.getElementById('history-table-body');
   const emptyHistoryPlaceholder = document.getElementById('empty-history-placeholder');
   const btnClearHistory = document.getElementById('btn-clear-history');
+  const threatSearchInput = document.getElementById('threat-search-input');
+  const btnClearSearch = document.getElementById('btn-clear-search');
+  const filterPills = document.querySelectorAll('.filter-pill');
+  const countAll = document.getElementById('count-all');
+  const countMessages = document.getElementById('count-messages');
+  const countUrls = document.getElementById('count-urls');
+  const countHigh = document.getElementById('count-high');
+
+  // Forensics Modal Elements
+  const modalOverlay = document.getElementById('threat-detail-modal');
+  const modalCloseBtn = document.getElementById('modal-close-btn');
+  const modalThreatTitle = document.getElementById('modal-threat-title');
+  const modalSeverityBadge = document.getElementById('modal-severity-badge');
+  const modalBodyContent = document.getElementById('modal-body-content');
+
+  // Chrome Extension Modal Elements
+  const btnOpenExtensionModal = document.getElementById('btn-open-extension-modal');
+  const extensionModal = document.getElementById('extension-modal');
+  const modalExtCloseBtn = document.getElementById('modal-ext-close-btn');
+  const btnCopyExtPath = document.getElementById('btn-copy-ext-path');
+  const extPathBox = document.getElementById('ext-path-box');
 
   // Quick Demo Presets
   const presetButtons = document.querySelectorAll('.preset-btn');
 
   // Internal client state
+  let allAlertRecords = [];
+  let currentFilter = 'all';
+  let currentSearchQuery = '';
   let localScanHistory = [];
   try {
     const saved = localStorage.getItem('scamsaathi_scan_history');
@@ -76,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (e) {
     console.warn('Could not read scan history from localStorage:', e);
   }
+
 
   // --- Preset Scenarios for Hackathon Demonstrations ---
   const demoPresets = {
@@ -135,11 +165,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Clear Scan History ---
   btnClearHistory.addEventListener('click', async () => {
     localScanHistory = [];
+    allAlertRecords = [];
     localStorage.removeItem('scamsaathi_scan_history');
-    renderHistoryTable();
+    applyFiltersAndRender();
     updateTelemetryMetrics();
     try {
-      await fetch('/api/clear', { method: 'POST' });
+      await fetch(`${API_BASE}/api/clear`, { method: 'POST' });
     } catch (e) {
       // Backend may be offline; local clear already handled
     }
@@ -148,15 +179,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Check Backend Connectivity & Load Initial Stats ---
   async function checkBackendHealth() {
     try {
-      statusDot.className = 'status-dot status-checking';
-      statusLabel.textContent = 'Checking Backend...';
+      if (statusDot) statusDot.className = 'status-dot status-checking';
+      if (statusLabel) statusLabel.textContent = 'Checking Backend...';
 
-      const res = await fetch('/api/stats', { method: 'GET', signal: AbortSignal.timeout(4000) });
+      const res = await fetch(`${API_BASE}/api/stats`, { method: 'GET', signal: AbortSignal.timeout(4000) });
       if (res.ok) {
         const stats = await res.json();
-        statusDot.className = 'status-dot status-online';
-        statusLabel.textContent = 'Backend Online';
-        backendStatusBanner.classList.add('hidden');
+        if (statusDot) statusDot.className = 'status-dot status-online';
+        if (statusLabel) statusLabel.textContent = 'Backend Online';
+        if (backendStatusBanner) backendStatusBanner.classList.add('hidden');
         renderServerStats(stats);
       } else {
         markBackendOffline();
@@ -167,9 +198,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function markBackendOffline() {
-    statusDot.className = 'status-dot status-offline';
-    statusLabel.textContent = 'Backend Offline';
-    backendStatusBanner.classList.remove('hidden');
+    if (statusDot) statusDot.className = 'status-dot status-offline';
+    if (statusLabel) statusLabel.textContent = 'Backend Offline';
+    if (backendStatusBanner) backendStatusBanner.classList.remove('hidden');
   }
 
   btnRetryBackend.addEventListener('click', checkBackendHealth);
@@ -231,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnAnalyze.disabled = true;
 
     try {
-      const response = await fetch('/api/check-url', {
+      const response = await fetch(`${API_BASE}/api/check-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl }),
@@ -267,9 +298,9 @@ document.addEventListener('DOMContentLoaded', () => {
         redacted_message: `Inspected Target URL: ${report.normalized_url}`
       };
 
-      statusDot.className = 'status-dot status-online';
-      statusLabel.textContent = 'Backend Online';
-      backendStatusBanner.classList.add('hidden');
+      if (statusDot) statusDot.className = 'status-dot status-online';
+      if (statusLabel) statusLabel.textContent = 'Backend Online';
+      if (backendStatusBanner) backendStatusBanner.classList.add('hidden');
 
       renderScanResult(transformedResult, '', report.normalized_url);
       saveToHistory(transformedResult, '', report.normalized_url);
@@ -298,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // ScamSaathi backend supports POST /api/analyze and POST /api/scan
       let response;
       try {
-        response = await fetch('/api/analyze', {
+        response = await fetch(`${API_BASE}/api/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, url }),
@@ -306,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       } catch (firstErr) {
         // Fallback to /api/scan
-        response = await fetch('/api/scan', {
+        response = await fetch(`${API_BASE}/api/scan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, url }),
@@ -322,9 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
       
       // Update system status
-      statusDot.className = 'status-dot status-online';
-      statusLabel.textContent = 'Backend Online';
-      backendStatusBanner.classList.add('hidden');
+      if (statusDot) statusDot.className = 'status-dot status-online';
+      if (statusLabel) statusLabel.textContent = 'Backend Online';
+      if (backendStatusBanner) backendStatusBanner.classList.add('hidden');
 
       // Render actual backend result
       renderScanResult(result, message, url);
@@ -533,42 +564,128 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- History Management ---
+  // --- History & Threat Records Management ---
   function saveToHistory(result, message, url) {
     const entry = {
-      id: Date.now(),
+      id: result.record_id || Date.now(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      target: (message || url || 'Input').slice(0, 50),
+      target: (url || message || 'Analyzed Input').trim(),
+      snippet: (message || '').trim(),
+      url: (url || '').trim(),
       category: result.threat_type || (result.threat_categories && result.threat_categories[0]) || 'Analysis',
-      score: result.risk_score || 0,
-      severity: result.severity || 'Low'
+      score: result.risk_score !== undefined ? result.risk_score : 0,
+      severity: result.severity || 'Low',
+      details: result
     };
 
+    // Prepend to in-memory store
+    allAlertRecords.unshift(entry);
     localScanHistory.unshift(entry);
-    if (localScanHistory.length > 20) {
-      localScanHistory.pop();
-    }
+    if (localScanHistory.length > 50) localScanHistory.pop();
 
     try {
       localStorage.setItem('scamsaathi_scan_history', JSON.stringify(localScanHistory));
     } catch (e) {}
 
-    renderHistoryTable();
+    applyFiltersAndRender();
     updateTelemetryMetrics();
   }
 
-  function renderHistoryTable() {
-    if (localScanHistory.length === 0) {
+  // Fetch SQLite alert records from backend
+  async function loadAlertsFromBackend() {
+    try {
+      const response = await fetch(`${API_BASE}/api/alerts?limit=100`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(4000)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const serverAlerts = data.alerts || data.history || [];
+        
+        // Map backend schema
+        const mapped = serverAlerts.map(r => ({
+          id: r.id,
+          timestamp: r.timestamp || 'Recent',
+          target: r.target_url || r.message_snippet || 'Analyzed Target',
+          snippet: r.message_snippet || '',
+          url: r.target_url || '',
+          category: r.threat_type || r.categories || 'Cyber Threat',
+          score: r.risk_score !== undefined ? r.risk_score : 0,
+          severity: r.severity || 'Low',
+          details: r.details || null
+        }));
+
+        if (mapped.length > 0) {
+          // Merge with any local items
+          const existingIds = new Set(mapped.map(m => String(m.id)));
+          const uniqueLocals = localScanHistory.filter(l => !existingIds.has(String(l.id)));
+          allAlertRecords = [...mapped, ...uniqueLocals];
+        } else if (localScanHistory.length > 0) {
+          allAlertRecords = [...localScanHistory];
+        }
+        applyFiltersAndRender();
+      } else if (localScanHistory.length > 0) {
+        allAlertRecords = [...localScanHistory];
+        applyFiltersAndRender();
+      }
+    } catch (e) {
+      if (localScanHistory.length > 0) {
+        allAlertRecords = [...localScanHistory];
+        applyFiltersAndRender();
+      }
+    }
+  }
+
+  // Live filter and render threats table
+  function applyFiltersAndRender() {
+    // 1. Compute category counts across all records
+    const totalCount = allAlertRecords.length;
+    const msgCount = allAlertRecords.filter(r => (r.snippet && r.snippet.length > 0) || !r.url).length;
+    const urlCount = allAlertRecords.filter(r => (r.url && r.url.length > 0) || (r.target && (r.target.includes('http') || r.target.includes('.'))) || (r.category && r.category.includes('URL'))).length;
+    const highCount = allAlertRecords.filter(r => ['HIGH', 'CRITICAL'].includes(String(r.severity).toUpperCase())).length;
+
+    if (countAll) countAll.textContent = totalCount;
+    if (countMessages) countMessages.textContent = msgCount;
+    if (countUrls) countUrls.textContent = urlCount;
+    if (countHigh) countHigh.textContent = highCount;
+
+    // 2. Filter by selected category pill
+    let filtered = allAlertRecords;
+    if (currentFilter === 'messages') {
+      filtered = filtered.filter(r => (r.snippet && r.snippet.length > 0) || !r.url);
+    } else if (currentFilter === 'urls') {
+      filtered = filtered.filter(r => (r.url && r.url.length > 0) || (r.target && (r.target.includes('http') || r.target.includes('.'))) || (r.category && r.category.includes('URL')));
+    } else if (currentFilter === 'high') {
+      filtered = filtered.filter(r => ['HIGH', 'CRITICAL'].includes(String(r.severity).toUpperCase()));
+    }
+
+    // 3. Filter by live search query
+    const q = currentSearchQuery.trim().toLowerCase();
+    if (q) {
+      filtered = filtered.filter(r => {
+        const tgt = (r.target || '').toLowerCase();
+        const snp = (r.snippet || '').toLowerCase();
+        const url = (r.url || '').toLowerCase();
+        const cat = (r.category || '').toLowerCase();
+        const sev = (r.severity || '').toLowerCase();
+        return tgt.includes(q) || snp.includes(q) || url.includes(q) || cat.includes(q) || sev.includes(q);
+      });
+    }
+
+    // 4. Render Table
+    if (filtered.length === 0) {
+      const msg = q
+        ? `No matching threats found for query "<strong>${escapeHtml(q)}</strong>". Try searching for 'sbi', 'power', 'http', or clear the search.`
+        : 'No threat scans match the selected category filter.';
       historyTableBody.innerHTML = `
-        <tr class="empty-history-row" id="empty-history-placeholder">
+        <tr class="empty-history-row">
           <td colspan="6" class="empty-history-cell">
             <div class="empty-history-msg">
               <svg class="empty-history-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <p>No scans recorded yet. Enter a message or URL above and click <strong>Analyze Cyber Threat</strong> to perform your first assessment.</p>
+              <p>${msg}</p>
             </div>
           </td>
         </tr>
@@ -577,26 +694,187 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     historyTableBody.innerHTML = '';
-    localScanHistory.forEach(item => {
+    filtered.forEach(item => {
       const tr = document.createElement('tr');
-      const sevClass = `badge-${item.severity.toLowerCase()}`;
+      tr.className = 'clickable-row';
+      tr.title = 'Click to view complete threat forensics';
+
+      const sev = (item.severity || 'Low').toUpperCase();
+      const sevClass = `badge-${sev.toLowerCase()}`;
+      
+      // Target display snippet
+      const rawTarget = item.target || item.snippet || item.url || 'Analyzed Item';
+      const displayTarget = highlightMatch(rawTarget.slice(0, 65) + (rawTarget.length > 65 ? '...' : ''), q);
+      const displayCat = highlightMatch(item.category || 'Threat Assessment', q);
+
       tr.innerHTML = `
         <td class="history-time">${escapeHtml(item.timestamp)}</td>
-        <td class="history-snippet" title="${escapeHtml(item.target)}">${escapeHtml(item.target)}</td>
-        <td><span class="threat-tag">${escapeHtml(item.category)}</span></td>
+        <td class="history-snippet">${displayTarget}</td>
+        <td><span class="threat-tag">${displayCat}</span></td>
         <td class="history-score-cell">${item.score}/100</td>
-        <td><span class="badge ${sevClass}" style="font-size:0.74rem;">${escapeHtml(item.severity)}</span></td>
-        <td><span style="font-size:0.75rem; color:var(--color-safe);">Scanned</span></td>
+        <td><span class="badge ${sevClass}" style="font-size:0.74rem;">${escapeHtml(sev)}</span></td>
+        <td><button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:0.2rem 0.5rem;">Inspect &rsaquo;</button></td>
       `;
+
+      tr.addEventListener('click', () => openForensicsModal(item));
       historyTableBody.appendChild(tr);
     });
   }
 
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const escapedText = escapeHtml(text);
+    const escapedQuery = escapeHtml(query);
+    const regex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escapedText.replace(regex, '<span class="highlight-match">$1</span>');
+  }
+
+  // Deep Forensics Modal Viewer
+  function openForensicsModal(item) {
+    if (!modalOverlay || !modalBodyContent) return;
+
+    const sev = (item.severity || 'Low').toUpperCase();
+    modalSeverityBadge.className = `badge badge-${sev.toLowerCase()}`;
+    modalSeverityBadge.textContent = `${sev} THREAT (${item.score}/100)`;
+    modalThreatTitle.textContent = item.category || 'Threat Analysis Forensics';
+
+    const cleanInput = item.url || item.snippet || item.target || 'N/A';
+    const details = item.details || {};
+    const indicators = details.detected_indicators || details.signals || [];
+    const recommendations = details.recommended_actions || details.safe_next_steps || [
+      'Do not click unverified links or share confidential banking OTPs.',
+      'In case of suspected fraud, report immediately to National Helpline 1930.'
+    ];
+
+    let indicatorsHtml = '<div style="font-size:0.8rem; color:var(--text-muted);">No specific anomalous indicators recorded.</div>';
+    if (indicators.length > 0) {
+      indicatorsHtml = indicators.map(ind => `
+        <div style="background:rgba(15,23,42,0.6); border:1px solid var(--border-subtle); border-radius:6px; padding:0.6rem 0.75rem; margin-bottom:0.4rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+            <strong style="color:var(--color-cyan); font-size:0.82rem;">${escapeHtml(ind.name || ind.label || ind.rule || 'Indicator')}</strong>
+            <span style="font-size:0.7rem; color:var(--text-dim);">${ind.weight ? `+${ind.weight} pts` : ''}</span>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">${escapeHtml(ind.explanation || ind.desc || '')}</div>
+        </div>
+      `).join('');
+    }
+
+    const recsHtml = recommendations.map(rec => `
+      <li style="margin-bottom:0.35rem; color:#e2e8f0; font-size:0.8rem;">🛡️ ${escapeHtml(rec)}</li>
+    `).join('');
+
+    modalBodyContent.innerHTML = `
+      <div>
+        <div class="modal-section-title">Analyzed Cyber Input / Target</div>
+        <div class="modal-code-box">${escapeHtml(cleanInput)}</div>
+      </div>
+      <div>
+        <div class="modal-section-title">Forensic Indicators Detected (${indicators.length})</div>
+        <div>${indicatorsHtml}</div>
+      </div>
+      <div>
+        <div class="modal-section-title">Recommended Defensive Actions</div>
+        <ul style="list-style:none; padding-left:0;">${recsHtml}</ul>
+      </div>
+      <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.25); border-radius:8px; padding:0.65rem 0.85rem; font-size:0.75rem; color:#c7d2fe;">
+        <strong>Official Support:</strong> Report cybercrime incidents to India's National Cyber Crime Helpline: <strong>1930</strong> or <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer" style="color:var(--color-cyan);">cybercrime.gov.in</a>.
+      </div>
+    `;
+
+    modalOverlay.classList.remove('hidden');
+  }
+
+  // Search input events
+  if (threatSearchInput) {
+    threatSearchInput.addEventListener('input', (e) => {
+      currentSearchQuery = e.target.value;
+      if (btnClearSearch) {
+        if (currentSearchQuery) {
+          btnClearSearch.classList.remove('hidden');
+        } else {
+          btnClearSearch.classList.add('hidden');
+        }
+      }
+      applyFiltersAndRender();
+    });
+  }
+
+  if (btnClearSearch) {
+    btnClearSearch.addEventListener('click', () => {
+      if (threatSearchInput) threatSearchInput.value = '';
+      currentSearchQuery = '';
+      btnClearSearch.classList.add('hidden');
+      applyFiltersAndRender();
+    });
+  }
+
+  // Filter pills events
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilter = pill.getAttribute('data-filter') || 'all';
+      applyFiltersAndRender();
+    });
+  });
+
+  // Modal close events
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', () => modalOverlay.classList.add('hidden'));
+  }
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.add('hidden');
+    });
+  }
+
+  // Chrome Extension Modal Events
+  if (btnOpenExtensionModal && extensionModal) {
+    btnOpenExtensionModal.addEventListener('click', () => {
+      extensionModal.classList.remove('hidden');
+    });
+  }
+  if (modalExtCloseBtn && extensionModal) {
+    modalExtCloseBtn.addEventListener('click', () => {
+      extensionModal.classList.add('hidden');
+    });
+  }
+  if (extensionModal) {
+    extensionModal.addEventListener('click', (e) => {
+      if (e.target === extensionModal) extensionModal.classList.add('hidden');
+    });
+  }
+  if (btnCopyExtPath && extPathBox) {
+    btnCopyExtPath.addEventListener('click', async () => {
+      const pathText = extPathBox.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(pathText);
+        btnCopyExtPath.textContent = 'Copied to Clipboard!';
+        setTimeout(() => {
+          btnCopyExtPath.textContent = 'Copy Local Path';
+        }, 2200);
+      } catch (err) {
+        prompt('Copy this folder path:', pathText);
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (modalOverlay && !modalOverlay.classList.contains('hidden')) {
+        modalOverlay.classList.add('hidden');
+      }
+      if (extensionModal && !extensionModal.classList.contains('hidden')) {
+        extensionModal.classList.add('hidden');
+      }
+    }
+  });
+
   function updateTelemetryMetrics() {
-    const total = localScanHistory.length;
-    const highAndCritical = localScanHistory.filter(i => ['HIGH', 'CRITICAL'].includes(i.severity.toUpperCase())).length;
-    const safe = localScanHistory.filter(i => i.severity.toUpperCase() === 'LOW').length;
-    const urls = localScanHistory.filter(i => i.target.includes('http://') || i.target.includes('https://') || i.target.includes('.')).length;
+    const total = allAlertRecords.length;
+    const highAndCritical = allAlertRecords.filter(i => ['HIGH', 'CRITICAL'].includes(String(i.severity).toUpperCase())).length;
+    const safe = allAlertRecords.filter(i => String(i.severity).toUpperCase() === 'LOW').length;
+    const urls = allAlertRecords.filter(i => (i.url && i.url.length > 0) || (i.target && (i.target.includes('http') || i.target.includes('.')))).length;
 
     metricTotalScans.textContent = total;
     metricHighThreats.textContent = highAndCritical;
@@ -618,6 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
       metricSafeScans.textContent = stats.safe_scans_count;
     }
   }
+
 
   // --- UI State Changers ---
   function showIdleState() {
@@ -680,7 +959,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Initial setup
-  renderHistoryTable();
+  applyFiltersAndRender();
   updateTelemetryMetrics();
   checkBackendHealth();
+  loadAlertsFromBackend();
 });

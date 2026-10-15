@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <!-- Ambient cyber background glow elements -->
@@ -38,10 +38,14 @@
       </div>
 
       <div class="nav-controls">
-        <div class="system-status-pill" id="system-status-indicator" title="Backend connection status">
-          <span class="status-dot status-checking" id="status-dot"></span>
-          <span class="status-label" id="status-label">Checking Backend...</span>
-        </div>
+        <button type="button" class="btn btn-outline btn-sm btn-extension" id="btn-open-extension-modal" title="Install Chrome Browser Extension">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <span>Chrome Extension</span>
+        </button>
         <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-stats" title="Refresh dashboard data">
           <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
@@ -450,6 +454,31 @@
         </div>
       </div>
 
+      <!-- Threat History Search & Filter Toolbar -->
+      <div class="history-toolbar">
+        <div class="history-search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            type="text" 
+            id="threat-search-input" 
+            class="history-search-input" 
+            placeholder="Search messages or spam URLs (e.g. sbi, bijli, telegram, http, .xyz)..." 
+            autocomplete="off"
+            aria-label="Search threat history"
+          >
+          <button type="button" id="btn-clear-search" class="btn-clear-search hidden" title="Clear search query">&times;</button>
+        </div>
+        <div class="history-filter-pills" role="radiogroup" aria-label="Filter threat types">
+          <button type="button" class="filter-pill active" data-filter="all">All Threats <span class="pill-count" id="count-all">0</span></button>
+          <button type="button" class="filter-pill" data-filter="messages">Messages <span class="pill-count" id="count-messages">0</span></button>
+          <button type="button" class="filter-pill" data-filter="urls">Spam URLs <span class="pill-count" id="count-urls">0</span></button>
+          <button type="button" class="filter-pill" data-filter="high">High/Critical <span class="pill-count" id="count-high">0</span></button>
+        </div>
+      </div>
+
       <div class="table-responsive">
         <table class="history-table" id="history-table">
           <thead>
@@ -494,6 +523,86 @@
       </div>
     </div>
   </footer>
+
+  <!-- Threat Forensics Deep Inspection Modal -->
+  <div class="modal-overlay hidden" id="threat-detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-threat-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="badge badge-high" id="modal-severity-badge">HIGH</span>
+          <h3 class="modal-title" id="modal-threat-title">Threat Forensics Inspection</h3>
+        </div>
+        <button type="button" class="modal-close-btn" id="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body-content">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Chrome Extension Installation Modal -->
+  <div class="modal-overlay hidden" id="extension-modal" role="dialog" aria-modal="true" aria-labelledby="modal-ext-title">
+    <div class="modal-card extension-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="badge" style="background:rgba(56,189,248,0.2); color:var(--color-cyan); border:1px solid var(--color-cyan);">Manifest V3</span>
+          <h3 class="modal-title" id="modal-ext-title">Install ScamSaathi Chrome Extension</h3>
+        </div>
+        <button type="button" class="modal-close-btn" id="modal-ext-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="ext-intro-box">
+          <p>Protect your browser in real-time. The ScamSaathi Chrome Extension inspects active page URLs on demand and gives you right-click threat analysis on any highlighted message or SMS.</p>
+        </div>
+
+        <div class="ext-steps-list">
+          <div class="ext-step-item">
+            <div class="ext-step-num">1</div>
+            <div class="ext-step-content">
+              <strong>Locate or Download the Extension</strong>
+              <p>You can load directly from your existing local project or download as a standalone zip archive.</p>
+              <div class="ext-actions-row">
+                <a href="/api/download-extension" download="scamsaathi-chrome-extension.zip" class="btn btn-primary btn-sm" id="btn-download-ext-zip">
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download Extension (.zip)</span>
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-ext-path">
+                  <span>Copy Local Path</span>
+                </button>
+              </div>
+              <div class="ext-path-box" id="ext-path-box">c:\Users\ASUS\Downloads\main scam sathi\extension</div>
+            </div>
+          </div>
+
+          <div class="ext-step-item">
+            <div class="ext-step-num">2</div>
+            <div class="ext-step-content">
+              <strong>Open Extensions in Google Chrome</strong>
+              <p>Open a new tab in Chrome and go to: <code class="ext-code-pill">chrome://extensions</code></p>
+            </div>
+          </div>
+
+          <div class="ext-step-item">
+            <div class="ext-step-num">3</div>
+            <div class="ext-step-content">
+              <strong>Enable Developer Mode & Click "Load unpacked"</strong>
+              <p>Toggle <strong>"Developer mode"</strong> in the top-right corner, click <strong>"Load unpacked"</strong>, and select the <code>extension</code> folder!</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="ext-features-grid">
+          <div class="ext-feat-item">🛡️ 1-Click Page Link Inspector</div>
+          <div class="ext-feat-item">🔍 Right-Click "Inspect with ScamSaathi"</div>
+          <div class="ext-feat-item">🔒 Zero-Network Privacy Engine</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/js/app.js"></script>
 </body>

@@ -11,18 +11,26 @@ Provides endpoints:
 """
 
 import os
-from flask import Flask, request, jsonify, render_template, send_from_directory
+import io
+import zipfile
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
+from flask_cors import CORS
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from analyzer.scoring import calculate_risk_score
 from analyzer.url_checker import analyze_dedicated_url
-from db import init_db, record_scan, get_telemetry_stats, get_recent_alerts, clear_all_scans
+from db import (
+    init_db, record_scan, get_telemetry_stats, get_recent_alerts,
+    get_alert_by_id, clear_all_scans
+)
 
 app = Flask(
     __name__,
     static_folder='static',
     template_folder='templates'
 )
+CORS(app)
+
 
 # Enforce 1MB maximum payload limit
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
@@ -181,17 +189,32 @@ def stats():
         return jsonify({'error': f'Failed to retrieve telemetry stats: {str(exc)}'}), 500
 
 @app.route('/api/alerts', methods=['GET'])
+@app.route('/api/history', methods=['GET'])
 def alerts():
-    """Returns recent scan history records."""
+    """Returns recent scan history records with optional keyword filtering."""
     try:
-        limit = request.args.get('limit', default=15, type=int)
-        limit = max(1, min(limit, 50))
-        recent = get_recent_alerts(limit=limit)
-        return jsonify({'alerts': recent}), 200
+        limit = request.args.get('limit', default=50, type=int)
+        limit = max(1, min(limit, 100))
+        search = request.args.get('search', default='', type=str)
+        recent = get_recent_alerts(limit=limit, search=search)
+        return jsonify({'alerts': recent, 'history': recent, 'count': len(recent)}), 200
     except Exception as exc:
         return jsonify({'error': f'Failed to fetch alert history: {str(exc)}'}), 500
 
+@app.route('/api/alerts/<int:record_id>', methods=['GET'])
+@app.route('/api/history/<int:record_id>', methods=['GET'])
+def alert_detail(record_id: int):
+    """Returns deep analysis forensic details for a single record."""
+    try:
+        detail = get_alert_by_id(record_id)
+        if not detail:
+            return jsonify({'error': 'Record not found'}), 404
+        return jsonify(detail), 200
+    except Exception as exc:
+        return jsonify({'error': f'Failed to fetch alert detail: {str(exc)}'}), 500
+
 @app.route('/api/clear', methods=['POST'])
+@app.route('/api/history', methods=['DELETE'])
 def clear_history():
     """Clears all historical scans from the SQLite database."""
     try:
@@ -199,6 +222,33 @@ def clear_history():
         return jsonify({'status': 'cleared', 'message': 'All scan records reset successfully.'}), 200
     except Exception as exc:
         return jsonify({'error': f'Failed to clear scan history: {str(exc)}'}), 500
+
+@app.route('/api/download-extension', methods=['GET'])
+def download_extension():
+    """Generates and serves a ZIP archive of the ScamSaathi Chrome extension."""
+    try:
+        ext_dir = os.path.join(app.root_path, 'extension')
+        if not os.path.isdir(ext_dir):
+            return jsonify({'error': 'Extension folder not found.'}), 404
+
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(ext_dir):
+                for file in files:
+                    abs_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_path, ext_dir)
+                    zf.write(abs_path, arcname=rel_path)
+
+        memory_file.seek(0)
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='scamsaathi-chrome-extension.zip'
+        )
+    except Exception as exc:
+        return jsonify({'error': f'Failed to generate extension zip: {str(exc)}'}), 500
+
 
 if __name__ == '__main__':
     print("=" * 65)

@@ -89,19 +89,54 @@ def get_telemetry_stats() -> dict:
         'suspicious_urls_count': suspicious_urls
     }
 
-def get_recent_alerts(limit: int = 15) -> list[dict]:
-    """Fetches recent scan records."""
+def get_recent_alerts(limit: int = 50, search: str = '') -> list[dict]:
+    """Fetches recent scan records with optional keyword filtering."""
     init_db()
     with get_connection() as conn:
-        rows = conn.execute("""
-            SELECT id, timestamp, message_snippet, target_url, threat_type,
-                   risk_score, severity, categories, indicators_count
-            FROM scans
-            ORDER BY id DESC
-            LIMIT ?
-        """, (limit,)).fetchall()
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            rows = conn.execute("""
+                SELECT id, timestamp, message_snippet, target_url, threat_type,
+                       risk_score, severity, categories, indicators_count, details_json
+                FROM scans
+                WHERE message_snippet LIKE ? OR target_url LIKE ? OR categories LIKE ? OR threat_type LIKE ?
+                ORDER BY id DESC
+                LIMIT ?
+            """, (term, term, term, term, limit)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT id, timestamp, message_snippet, target_url, threat_type,
+                       risk_score, severity, categories, indicators_count, details_json
+                FROM scans
+                ORDER BY id DESC
+                LIMIT ?
+            """, (limit,)).fetchall()
 
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        item = dict(r)
+        if item.get('details_json'):
+            try:
+                item['details'] = json.loads(item['details_json'])
+            except Exception:
+                item['details'] = {}
+        result.append(item)
+    return result
+
+def get_alert_by_id(alert_id: int) -> dict:
+    """Retrieves deep analysis forensic details for a single record."""
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM scans WHERE id = ?", (alert_id,)).fetchone()
+        if not row:
+            return None
+        res = dict(row)
+        if res.get('details_json'):
+            try:
+                res['details'] = json.loads(res['details_json'])
+            except Exception:
+                res['details'] = {}
+        return res
 
 def clear_all_scans():
     """Resets the scans database for a fresh demonstration run."""
@@ -109,3 +144,4 @@ def clear_all_scans():
     with get_connection() as conn:
         conn.execute("DELETE FROM scans")
         conn.commit()
+
