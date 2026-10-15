@@ -1,9 +1,30 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-.venv/
+*$py.class
+
+# Virtual Environments
 venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables & Secrets
 .env
+.env.*
+secrets.json
+
+# Local SQLite databases & Logs
+*.db
+*.sqlite3
+scamsaathi.db
 *.log
+
+# Operating System & IDE artifacts
 .DS_Store
 Thumbs.db
-scamsaathi.db
+.vscode/
+.idea/
+*.swp
+*.bak
+*.tmp
